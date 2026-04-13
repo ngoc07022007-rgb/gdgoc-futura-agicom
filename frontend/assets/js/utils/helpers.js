@@ -7,3 +7,7 @@ export function showToast(type, msg) {
     c.appendChild(d);
     setTimeout(() => { d.classList.add('removing'); setTimeout(() => d.remove(), 300); }, 3000);
 }
+
+export function getConfLevel(val) { 
+    return val >= 90 ? 'high' : (val > 70 ? 'medium' : 'low'); 
+}
