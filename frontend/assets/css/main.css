@@ -1,1 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
+/* Import các module CSS */
+@import 'variables.css';
+@import 'components.css';
+
+/* Nếu sau này CSS dài quá, bạn có thể tách thêm layout.css và import nó vào đây */
