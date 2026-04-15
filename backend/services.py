@@ -86,11 +86,12 @@ async def customer_care_fast_track(data: dict):
     except:
         return {"track": "Fast Track", "status": "Error parsing JSON"}
 
+# Cập nhật hàm cskh_rag_service trong services.py
+
 async def cskh_rag_service(customer_text: str, brand_tone: str):
-    # 1. Tìm kiếm ở CẢ 3 KHO (Policy, Product và Resolved_QA)
+    # 1. Retrieval (Tìm kiếm context) - Giữ nguyên logic cũ của bạn
     policy_hits = policy_col.query(query_texts=[customer_text], n_results=2)
     product_hits = product_col.query(query_texts=[customer_text], n_results=2)
-    # THÊM DÒNG NÀY: Truy vấn kho kiến thức đã học từ con người
     qa_hits = resolved_qa_col.query(query_texts=[customer_text], n_results=2)
     
     def get_all_hits(hits):
@@ -98,25 +99,14 @@ async def cskh_rag_service(customer_text: str, brand_tone: str):
             return "\n- ".join(hits['documents'][0])
         return "Không có thông tin cụ thể."
 
-    # 2. CẬP NHẬT CONTEXT: Đưa thêm phần "Kinh nghiệm giải đáp" vào
     context = f"""
     CÁC THÔNG TIN TÌM THẤY:
-    Về quy định: 
-    - {get_all_hits(policy_hits)}
-    
-    Về sản phẩm: 
-    - {get_all_hits(product_hits)}
-
-    Kinh nghiệm giải đáp trước đây (Rất quan trọng):
-    - {get_all_hits(qa_hits)}
+    Quy định: {get_all_hits(policy_hits)}
+    Sản phẩm: {get_all_hits(product_hits)}
+    Kinh nghiệm: {get_all_hits(qa_hits)}
     """
-    
-    # Debug: In ra để bạn kiểm tra xem "Kinh nghiệm giải đáp" có hiện ra không
-    print("--- CONTEXT GỬI CHO AI ---")
-    print(context)
-    print("--------------------------")
 
-    # 3. GENERATION: Gửi context đã tổng hợp cho Gemini
+    # 2. Generation (Gọi AI phân tích cảm xúc và trả lời)
     user_prompt = CHAT_RAG_PROMPT.format(context=context, brand_tone=brand_tone)
     
     response = await client.aio.models.generate_content(
@@ -127,23 +117,18 @@ async def cskh_rag_service(customer_text: str, brand_tone: str):
     
     result = json.loads(response.text)
 
-    # ... (giữ nguyên phần sensor_insight và coordinate_agents bên dưới)
-    if result.get("sensor_insight"):
-        await coordinate_agents(result["sensor_insight"], "A56")
-        print(f"[!] SENSOR ALERT: {result['sensor_insight']}")
-
-    return result
-
-    # Sau khi nhận kết quả từ Gemini
-    if result.get("sensor_insight"):
-        # Tự động kích hoạt luồng điều phối
-        await coordinate_agents(result["sensor_insight"], "A56")
+    # 3. Logic Guardrail dựa trên Sentiment
+    sentiment = result.get("sentiment_analysis", "bình thường")
     
-    # 3. COORDINATION (Hành động của Cảm biến tiền phương)
+    # NÂNG CẤP: Nếu khách đang tức giận, không bao giờ cho phép Auto-Reply
+    if sentiment == "tức giận":
+        result["is_safe"] = False
+        print(f"[!] CẢNH BÁO: Phát hiện khách hàng đang tức giận!")
+
+    # 4. Coordination (Điều phối nếu có insight)
     if result.get("sensor_insight"):
-        print(f"[!] SENSOR ALERT: {result['sensor_insight']}")
-        # Ở đây bạn có thể gọi logic để báo cho Pricing Agent/Content Agent
-        # Ví dụ: await trigger_content_update(result['sensor_insight'])
+        # Trích xuất Product ID từ ngữ cảnh (giả định đang chat về A56)
+        await coordinate_agents(result["sensor_insight"], "A56")
 
     return result
 

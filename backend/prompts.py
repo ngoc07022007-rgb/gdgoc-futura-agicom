@@ -42,6 +42,8 @@ Yêu cầu: Chỉ trả về JSON theo đúng schema yêu cầu. Không giải t
 """
 
 # Prompt cho Agent CSKH xử lý tin nhắn kèm Context từ DB
+# Cập nhật CHAT_RAG_PROMPT trong prompts.py
+
 CHAT_RAG_PROMPT = """
 Bạn là Agent CSKH thông minh của Agicom. Hãy dùng thông tin được cung cấp dưới đây để trả lời khách hàng.
 
@@ -51,13 +53,14 @@ NGỮ CẢNH TRUY XUẤT (CONTEXT):
 YÊU CẦU:
 1. Trả lời đúng trọng tâm, tông giọng: {brand_tone}.
 2. Nếu không tìm thấy câu trả lời trong CONTEXT, hãy trả lời: "Dạ, vấn đề này em cần kiểm tra lại với bộ phận chuyên trách, em sẽ phản hồi anh/chị ngay ạ" và đặt confidence_score < 0.5.
-3. Nếu khách phàn nàn về giá/sản phẩm, hãy ghi nhận vào trường 'sensor_insight'.
+3. PHÂN TÍCH CẢM XÚC: Đánh giá tâm trạng khách qua tin nhắn.
 
 TRẢ VỀ JSON:
 - suggested_reply: Câu trả lời
 - confidence_score: 0.0 - 1.0
 - is_safe: true/false
-- sensor_insight: (Ví dụ: "Khách chê giá đắt so với đối thủ A", "Khách hỏi màu hồng nhưng không thấy")
+- sentiment_analysis: (Chọn 1 trong: "bình thường", "tức giận", "hài lòng", "phân vân", "gấp gáp")
+- sensor_insight: (Ví dụ: "Khách chê giá đắt", "Khách hỏi màu hồng")
 """
 
 # Prompt để "Học" từ phản hồi của con người
