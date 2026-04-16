@@ -1,4 +1,13 @@
-.venv/
+# Databases & Vector Stores
+agicom_system.db
+chroma_db/
+
+# Environment secrets
 .env
+
+# Python logs & caches
 __pycache__/
+*.py[cod]
+.venv/
+venv/
 .DS_Store
