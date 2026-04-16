@@ -5,7 +5,7 @@ from google.genai import types
 from config import policy_col, product_col, resolved_qa_col, client
 from prompts import DATA_ANALYST_PROMPT, CHAT_RAG_PROMPT, LEARNING_EXTRACTOR_PROMPT, STRATEGY_SYSTEM_PROMPT
 from models import MarketInsight
-from database import SessionLocal, CoordinationTask, ChatLog
+from database import SessionLocal, CoordinationTask, ChatLog, get_chat_history, save_message
 
 def fetch_raw_market_data(sku_id: str) -> dict:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -276,3 +276,40 @@ async def coordinate_agents(insight_text: str, product_id: str, risk_level: str 
         db.add(new_task)
         db.commit()
     db.close()
+
+async def chat_with_history_service(db, customer_id: str, user_text: str, brand_tone: str):
+    # BƯỚC 1: Lấy lịch sử chat cũ (10 câu gần nhất)
+    history_msgs = get_chat_history(db, customer_id, limit=10)
+    
+    # BƯỚC 2: Định dạng lịch sử thành chuỗi văn bản
+    history_context = ""
+    for msg in history_msgs:
+        prefix = "Khách" if msg.role == "user" else "AI"
+        history_context += f"{prefix}: {msg.content}\n"
+
+    # BƯỚC 3: Truy xuất thêm từ Vector DB (RAG) - Tận dụng logic cũ
+    # (Giả sử bạn dùng lại hàm cskh_rag_service nhưng đã tách phần gọi Gemini ra)
+    # Ở đây tôi làm gọn lại để tập trung vào phần History
+    
+    combined_prompt = f"""
+    Bạn là Agent CSKH của Agicom. Tông giọng: {brand_tone}.
+    
+    LỊCH SỬ HỘI THOẠI TRƯỚC ĐÓ:
+    {history_context}
+    
+    TIN NHẮN MỚI NHẤT CỦA KHÁCH:
+    {user_text}
+    
+    Hãy trả lời tin nhắn mới nhất dựa trên ngữ cảnh hội thoại trên. Trả về JSON theo định dạng:
+    {{"suggested_reply": "...", "confidence_score": 0.9}}
+    """
+
+    # BƯỚC 4: Gọi Gemini
+    response = await client.aio.models.generate_content(
+        model="gemini-flash-latest",
+        contents=combined_prompt,
+        config={"response_mime_type": "application/json"}
+    )
+    
+    ai_data = json.loads(response.text)
+    return ai_data

@@ -69,3 +69,8 @@ class ProductRequest(BaseModel):
     customer_context: CustomerContext
     shop_profile: ShopProfile        # Personalization input
     manager_directive: str = "Không có chỉ thị đặc biệt"
+
+class ChatSessionInput(BaseModel):
+    customer_id: str
+    message: str
+    brand_tone: str = "Chuyên nghiệp, nhiệt tình"

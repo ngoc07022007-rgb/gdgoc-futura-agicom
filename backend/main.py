@@ -7,7 +7,7 @@ from google.genai import types
 from config import client
 from models import (
     IncomingData, ProposalApproval, ChatMessage, ProductRequest,
-    GuardrailResponse, StrategyProposal, ShopProfile
+    GuardrailResponse, StrategyProposal, ShopProfile, ChatSessionInput
 )
 from prompts import CHAT_SYSTEM_PROMPT, STRATEGY_SYSTEM_PROMPT
 from services import (
@@ -15,9 +15,10 @@ from services import (
     customer_care_fast_track,
     analyze_raw_data_phase1,
     learn_from_human_service,
-    cskh_rag_service
+    cskh_rag_service,
+    chat_with_history_service
 )
-from database import SessionLocal, ChatLog, CoordinationTask, init_db
+from database import SessionLocal, ChatLog, CoordinationTask, save_message, init_db
 
 init_db()
 
@@ -227,6 +228,36 @@ async def get_daily_summary():
     except Exception as e:
         # In lỗi thật sự ra Terminal để bạn debug
         print(f"LỖI DAILY SUMMARY: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@app.post("/chat-v3")
+async def process_chat_with_history(data: ChatSessionInput):
+    db = SessionLocal()
+    try:
+        # 1. Lưu tin nhắn của Người dùng vào SQLite
+        save_message(db, data.customer_id, "user", data.message)
+
+        # 2. Xử lý Logic AI (Lấy history -> RAG -> Gemini)
+        ai_response = await chat_with_history_service(
+            db, data.customer_id, data.message, data.brand_tone
+        )
+        
+        reply_content = ai_response.get("suggested_reply", "Dạ, em chưa hiểu ý mình ạ.")
+
+        # 3. Lưu câu trả lời của AI vào SQLite
+        save_message(db, data.customer_id, "assistant", reply_content)
+
+        # 4. Trả về cho Frontend
+        return {
+            "status": "success",
+            "customer_id": data.customer_id,
+            "reply": reply_content,
+            "ai_evaluation": ai_response
+        }
+    except Exception as e:
+        print(f"LỖI CHAT HISTORY: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
