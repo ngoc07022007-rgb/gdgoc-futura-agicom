@@ -6,7 +6,7 @@ from google.genai import types
 # Nhập các thành phần từ file khác
 from config import client
 from models import (
-    IncomingData, ProposalApproval, ChatMessage, ProductRequest,
+    IncomingData, ProposalApproval, ChatMessageRequest, ProductRequest,
     GuardrailResponse, StrategyProposal, ShopProfile, ChatSessionInput
 )
 from prompts import CHAT_SYSTEM_PROMPT, STRATEGY_SYSTEM_PROMPT
@@ -18,7 +18,7 @@ from services import (
     cskh_rag_service,
     chat_with_history_service
 )
-from database import SessionLocal, ChatLog, CoordinationTask, save_message, init_db
+from database import SessionLocal, ChatLog, CoordinationTask, ChatMessage, save_message, init_db
 
 init_db()
 
@@ -81,7 +81,7 @@ async def human_approval_flow(approval: ProposalApproval):
         return {"status": "Re-evaluating", "message": "Đang tính toán lại dựa trên phản hồi của bạn"}
 
 @app.post("/fast-track-chat")
-async def process_customer_chat(chat: ChatMessage, profile: ShopProfile): # Assume profile passed from frontend
+async def process_customer_chat(chat: ChatMessageRequest, profile: ShopProfile): # Assume profile passed from frontend
     try:
         # Inject Tone and Target Customers
         personalized_chat_prompt = CHAT_SYSTEM_PROMPT.format(
@@ -169,7 +169,7 @@ async def process_market_strategy(product: ProductRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/fast-track-chat-v2")
-async def process_chat_v2(chat: ChatMessage, profile: ShopProfile, customer_id: str = "guest_user"):
+async def process_chat_v2(chat: ChatMessageRequest, profile: ShopProfile, customer_id: str = "guest_user"):
     # Lưu ý: Tôi thêm customer_id vào tham số. Bạn có thể lấy từ chat object nếu model ChatMessage có trường này.
     db = SessionLocal()
     try:
@@ -270,6 +270,46 @@ async def process_chat_with_history(data: ChatSessionInput):
     except Exception as e:
         print(f"LỖI CHAT HISTORY: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@app.delete("/chat/{customer_id}")
+async def delete_chat_history(customer_id: str):
+    db = SessionLocal()
+    try:
+        # Xóa các tin nhắn trong bảng ChatMessage của user này
+        db.query(ChatMessage).filter(ChatMessage.customer_id == customer_id).delete()
+        db.commit()
+        return {"status": "success", "message": f"Đã xóa lịch sử chat của {customer_id}"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "detail": str(e)}
+    finally:
+        db.close()
+
+@app.post("/system/reset-all")
+async def reset_all_data():
+    db = SessionLocal()
+    try:
+        # 1. Xóa sạch các bảng trong SQL
+        db.query(ChatMessage).delete()
+        db.query(ChatLog).delete()
+        db.query(CoordinationTask).delete()
+        db.commit()
+
+        # 2. Xóa sạch kiến thức trong Vector DB (ChromaDB)
+        from config import chroma_client
+        # Lấy danh sách tất cả collections và xóa sạch
+        all_cols = ["policy_db", "product_db", "resolved_qa_db"]
+        for col in all_cols:
+            try:
+                chroma_client.delete_collection(col)
+                # Tạo lại collection trống ngay lập tức
+                chroma_client.get_or_create_collection(col)
+            except:
+                pass
+
+        return {"status": "success", "message": "Hệ thống đã được đưa về trạng thái trắng."}
     finally:
         db.close()
 

@@ -43,8 +43,8 @@ class ProposalApproval(BaseModel):
     status: str     # "approved" hoặc "declined"
     feedback: str = ""
 
-class ChatMessage(BaseModel):
-    shop_policy: str = "Đổi trả trong 7 ngày. Phí ship khách chịu."
+class ChatMessageRequest(BaseModel):
+    shop_policy: str = ""
     customer_text: str
 
 class GuardrailResponse(BaseModel):
