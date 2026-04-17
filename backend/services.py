@@ -317,21 +317,23 @@ async def chat_with_history_service(db, customer_id: str, user_text: str, brand_
     
     ai_data = json.loads(response.text)
     
+        # Logic quyết định Auto-reply
+    # Một tin nhắn được coi là Auto-reply nếu: is_safe=True VÀ confidence >= 0.7 VÀ sentiment không tức giận
+    is_safe = ai_data.get("is_safe", False)
+    confidence = ai_data.get("confidence_score", 0.0)
     sentiment = ai_data.get("sentiment_analysis", "bình thường")
-    product_id = ai_data.get("identified_product_id", "General")
-    risk_level = ai_data.get("risk_level", "Thấp")
-    risk_cat = ai_data.get("risk_category", "None")
+
+    can_auto_reply = is_safe and confidence >= 0.7 and sentiment != "tức giận"
+    ai_data["can_auto_reply"] = can_auto_reply # Gửi cờ này về cho backend/frontend xử lý
+
+    # Vẫn chạy coordination agents để báo cáo rủi ro/task
     insight = ai_data.get("sensor_insight")
-
-    if sentiment == "tức giận" or risk_level == "Cao":
-        ai_data["is_safe"] = False
-
     if insight and insight != "None":
         await coordinate_agents(
             insight_text=insight, 
-            product_id=product_id, 
-            risk_level=risk_level, 
-            risk_category=risk_cat
+            product_id=ai_data.get("identified_product_id", "General"), 
+            risk_level=ai_data.get("risk_level", "Thấp"), 
+            risk_category=ai_data.get("risk_category", "None")
         )
         
     return ai_data

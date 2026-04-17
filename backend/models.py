@@ -90,3 +90,16 @@ class ReviewExtractedInsight(BaseModel):
     key_issue: str       # Vấn đề cốt lõi (vd: "Giao hàng chậm", "Lỗi móp méo")
     action_needed: bool  # Có cần agent khác xử lý không?
     qa_knowledge: str    # Bài học rút ra (ví dụ: "Nếu khách hỏi về móp méo, hãy báo do vận chuyển và xin lỗi")
+
+class ChatHumanOverride(BaseModel):
+    customer_id: str
+    customer_q: str        # Câu hỏi gốc của khách
+    ai_proposed_a: str     # Câu trả lời AI đã đề xuất nhưng bị từ chối
+    human_final_a: str     # Câu trả lời do chủ shop tự viết
+    brand_tone: str = "Chuyên nghiệp, nhiệt tình"
+
+class ChatProposalApproval(BaseModel):
+    customer_id: str
+    customer_q: str
+    proposed_a: str
+    brand_tone: str = "Chuyên nghiệp"

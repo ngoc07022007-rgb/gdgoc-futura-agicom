@@ -10,7 +10,7 @@ from google.genai import types
 from config import client, resolved_qa_col
 from models import (
     IncomingData, ProposalApproval, ChatMessageRequest, ProductRequest,
-    GuardrailResponse, StrategyProposal, ShopProfile, ChatSessionInput, ChatMessage, ReviewData
+    GuardrailResponse, StrategyProposal, ShopProfile, ChatSessionInput, ChatMessage, ReviewData, ChatHumanOverride, ChatProposalApproval
 )
 from prompts import CHAT_SYSTEM_PROMPT, STRATEGY_SYSTEM_PROMPT, REVIEW_LEARNING_PROMPT
 from services import (
@@ -419,28 +419,48 @@ async def get_all_reviews(product_id: str = None, limit: int = 20):
 async def process_chat_with_history(data: ChatSessionInput):
     db = SessionLocal()
     try:
-        # 1. Lưu tin nhắn của Người dùng vào SQLite
+        # 1. Lưu tin nhắn của Người dùng vào SQLite (Luôn lưu)
         save_message(db, data.customer_id, "user", data.message)
 
-        # 2. Xử lý Logic AI (Lấy history -> RAG -> Gemini)
+        # 2. Lấy đề xuất từ AI
         ai_response = await chat_with_history_service(
             db, data.customer_id, data.message, data.brand_tone
         )
         
-        reply_content = ai_response.get("suggested_reply", "Dạ, em chưa hiểu ý mình ạ.")
+        reply_content = ai_response.get("suggested_reply", "")
+        can_auto = ai_response.get("can_auto_reply", False)
 
-        # 3. Lưu câu trả lời của AI vào SQLite
-        save_message(db, data.customer_id, "assistant", reply_content)
+        # 3. KIỂM TRA TỰ ĐỘNG GỬI
+        if can_auto:
+            # Nếu tự động gửi -> Lưu luôn vào lịch sử ChatMessage
+            save_message(db, data.customer_id, "assistant", reply_content)
+            
+            # Lưu vào ChatLog để báo cáo insight
+            new_log = ChatLog(
+                customer_q=data.message,
+                ai_a=reply_content,
+                insight=ai_response.get("sensor_insight"),
+                is_archived=False
+            )
+            db.add(new_log)
+            db.commit()
+            
+            return {
+                "status": "auto_replied",
+                "reply": reply_content,
+                "ai_evaluation": ai_response
+            }
+        else:
+            # Nếu KHÔNG tự động gửi -> Trả về đề xuất cho Frontend duyệt, CHƯA lưu history assistant
+            return {
+                "status": "needs_approval",
+                "reply": reply_content,
+                "ai_evaluation": ai_response,
+                "message": "Tin nhắn này cần bạn duyệt hoặc chỉnh sửa trước khi gửi."
+            }
 
-        # 4. Trả về cho Frontend
-        return {
-            "status": "success",
-            "customer_id": data.customer_id,
-            "reply": reply_content,
-            "ai_evaluation": ai_response
-        }
     except Exception as e:
-        print(f"LỖI CHAT HISTORY: {str(e)}")
+        print(f"LỖI CHAT: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
@@ -482,6 +502,63 @@ async def reset_all_data():
                 pass
 
         return {"status": "success", "message": "Hệ thống đã được đưa về trạng thái trắng."}
+    finally:
+        db.close()
+
+@app.post("/chat-approve-proposal")
+async def approve_proposal(data: ChatProposalApproval):
+    """
+    Trường hợp: AI đề xuất -> Người dùng nhấn 'Duyệt' (Approve) mà không sửa gì.
+    """
+    db = SessionLocal()
+    try:
+        # 1. Lưu vào lịch sử chat để khách hàng nhận được tin nhắn
+        save_message(db, data.customer_id, "assistant", data.proposed_a)
+
+        # 2. Lưu vào ChatLog để làm dataset training sau này
+        # Đánh dấu insight là 'Approved' để AI biết đây là một ví dụ mẫu tốt (Good Example)
+        new_log = ChatLog(
+            customer_q=data.customer_q,
+            ai_a=data.proposed_a, # Lưu lại câu trả lời đã được duyệt
+            insight="AI_PROPOSAL_APPROVED", 
+            is_archived=False
+        )
+        db.add(new_log)
+        db.commit()
+
+        # 3. (Tùy chọn) Học ngay lập tức
+        # Vì người dùng đã duyệt, đây là kiến thức chuẩn, lưu vào Vector DB để làm RAG
+        await learn_from_human_service(data.customer_q, data.proposed_a)
+
+        return {"status": "success", "message": "Đã duyệt và gửi tin nhắn của AI."}
+    finally:
+        db.close()
+
+@app.post("/chat-human-override")
+async def handle_human_override(data: ChatHumanOverride):
+    """
+    Trường hợp: Người dùng sửa lại tin nhắn của AI.
+    """
+    db = SessionLocal()
+    try:
+        # 1. Lưu tin nhắn CUỐI CÙNG (của người) vào lịch sử chat
+        save_message(db, data.customer_id, "assistant", data.human_final_a)
+
+        # 2. LƯU DỮ LIỆU TRAINING (Quan trọng nhất ở đây)
+        # Chúng ta lưu cả 'Đề xuất cũ' và 'Kết quả mới' vào ChatLog
+        new_log = ChatLog(
+            customer_q=data.customer_q,
+            ai_a=data.human_final_a, 
+            insight=f"AI_PROPOSAL_REJECTED | Original Proposal: {data.ai_proposed_a}",
+            is_archived=False
+        )
+        db.add(new_log)
+        db.commit()
+
+        # 3. Học từ câu trả lời đúng của con người
+        await learn_from_human_service(data.customer_q, data.human_final_a)
+
+        return {"status": "success", "message": "Đã ghi nhận phản hồi và sửa đổi của bạn."}
     finally:
         db.close()
 
