@@ -135,9 +135,17 @@ async def cskh_rag_service(customer_text: str, brand_tone: str):
         }
 
     # 1. Retrieval
-    policy_hits = policy_col.query(query_texts=[customer_text], n_results=1)
-    product_hits = product_col.query(query_texts=[customer_text], n_results=1)
-    qa_hits = resolved_qa_col.query(query_texts=[customer_text], n_results=1)
+    def safe_query(collection, text):
+        try:
+            if collection.count() == 0:
+                return None
+            return collection.query(query_texts=[text], n_results=1)
+        except Exception:
+            return None
+
+    policy_hits = safe_query(policy_col, customer_text)
+    product_hits = safe_query(product_col, customer_text)
+    qa_hits = safe_query(resolved_qa_col, customer_text)
     
     # Một mẹo nhỏ: Chỉ lấy context nếu điểm số (distance) thấp (nghĩa là độ khớp cao)
     def get_valid_hits(hits):
@@ -294,9 +302,17 @@ async def chat_with_history_service(db, customer_id: str, user_text: str, brand_
 
     # BƯỚC 3: Truy xuất thêm từ Vector DB (RAG) - Tận dụng logic cũ
     # (Tương tự cskh_rag_service để lấy context, chúng ta tái cấu trúc nhanh)
-    policy_hits = policy_col.query(query_texts=[user_text], n_results=1)
-    product_hits = product_col.query(query_texts=[user_text], n_results=1)
-    qa_hits = resolved_qa_col.query(query_texts=[user_text], n_results=1)
+    def safe_query(collection, text):
+        try:
+            if collection.count() == 0:
+                return None
+            return collection.query(query_texts=[text], n_results=1)
+        except Exception:
+            return None
+
+    policy_hits = safe_query(policy_col, user_text)
+    product_hits = safe_query(product_col, user_text)
+    qa_hits = safe_query(resolved_qa_col, user_text)
     
     def get_valid_hits(hits):
         if hits and hits.get('documents') and len(hits['documents'][0]) > 0:

@@ -5,6 +5,7 @@ import os
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from google.genai import types
+from contextlib import asynccontextmanager
 
 # Nhập các thành phần từ file khác
 from config import client, resolved_qa_col
@@ -25,7 +26,24 @@ from database import SessionLocal, ChatLog, CoordinationTask, ChatMessage as DB_
 
 init_db()
 
-app = FastAPI(title="Agicom Core Backend")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Khởi động (Startup): Kiểm tra xem ChromaDB có bị Render xóa trắng không
+    from config import policy_col, product_col, resolved_qa_col
+    if policy_col.count() == 0:
+        print("[!] Render vừa khởi động lại, ChromaDB rỗng. Đang tự động nạp lại dữ liệu...")
+        try:
+            import seed_demo
+            # Gọi hàm seed_vector_db từ file seed_demo của bạn
+            seed_demo.seed_vector_db(policy_col, product_col, resolved_qa_col)
+            print("[OK] Đã nạp lại trí nhớ cho RAG thành công!")
+        except Exception as e:
+            print(f"[LỖI] Không thể auto-seed: {e}")
+    yield
+    # Khi server tắt (Shutdown) - không cần làm gì
+
+# TÌM DÒNG KHAI BÁO APP CŨ VÀ SỬA THÀNH DÒNG NÀY:
+app = FastAPI(title="Agicom Core Backend", lifespan=lifespan)
 
 # ---------------------------------------------------------------------------
 # CORS – cho phép frontend Netlify và localhost kết nối
