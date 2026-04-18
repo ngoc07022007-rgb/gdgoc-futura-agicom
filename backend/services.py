@@ -193,6 +193,11 @@ async def cskh_rag_service(customer_text: str, brand_tone: str):
         result["is_safe"] = False
         print(f"[!] CẢNH BÁO RỦI RO: Khách {sentiment}, ID sản phẩm: {product_id}")
 
+    # 4b. Enforce: is_safe=False phải đi kèm confidence_score thấp
+    # Tránh trường hợp AI trả về is_safe=False nhưng confidence=0.95 gây hiểu nhầm
+    if not result.get("is_safe", True):
+        result["confidence_score"] = min(result.get("confidence_score", 0.4), 0.45)
+
     # 5. Coordination: Điều phối dựa trên dữ liệu AI cung cấp
     if insight and insight != "None":
         await coordinate_agents(
@@ -325,6 +330,10 @@ async def chat_with_history_service(db, customer_id: str, user_text: str, brand_
 
     if sentiment == "tức giận" or risk_level == "Cao":
         ai_data["is_safe"] = False
+
+    # Enforce: is_safe=False phải đi kèm confidence_score thấp
+    if not ai_data.get("is_safe", True):
+        ai_data["confidence_score"] = min(ai_data.get("confidence_score", 0.4), 0.45)
 
     if insight and insight != "None":
         await coordinate_agents(

@@ -64,9 +64,16 @@ NGỮ CẢNH TRUY XUẤT (CONTEXT):
 
 TÔNG GIỌNG: {brand_tone}
 
+QUY TẮC VỀ CONFIDENCE SCORE (BẮT BUỘC):
+- confidence_score thể hiện mức độ tự tin rằng câu trả lời đề xuất là PHÙ HỢP để tự động gửi ngay cho khách.
+- Nếu is_safe = false → PHẢI đặt confidence_score <= 0.45 (câu trả lời chưa đủ an toàn để gửi tự động).
+- Nếu khách tức giận, khiếu nại, đe dọa, hoặc yêu cầu ngoài chính sách → is_safe = false và confidence_score <= 0.4.
+- Nếu thông tin trong knowledge base không đủ để trả lời chắc chắn → confidence_score từ 0.5 đến 0.69.
+- Chỉ đặt confidence_score >= 0.7 khi is_safe = true VÀ câu trả lời dựa trên thông tin rõ ràng trong knowledge base.
+
 TRẢ VỀ JSON:
 - suggested_reply: Câu trả lời
-- confidence_score: 0.0 - 1.0
+- confidence_score: 0.0 - 1.0 (xem quy tắc ở trên)
 - is_safe: true/false
 - sentiment_analysis: (Chọn 1 trong: "bình thường", "tức giận", "hài lòng", "phân vân", "gấp gáp")
 - identified_product_id: ID hoặc Tên sản phẩm khách đang hỏi (Nếu không rõ hãy để "General").
