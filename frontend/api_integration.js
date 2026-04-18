@@ -1809,7 +1809,6 @@ function _syncLiveChatToInbox(customerMsg, aiReply, evalData) {
   const sentiment = evalData.sentiment_analysis || '';
 
   const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  const newId = 'live_' + Date.now();
 
   // Tính sentiment score cho thanh màu trong danh sách (0-100)
   const sentimentScore = (() => {
@@ -1819,45 +1818,66 @@ function _syncLiveChatToInbox(customerMsg, aiReply, evalData) {
     return 55;
   })();
 
-  // ── Thêm vào đầu danh sách hội thoại ──
-  // Dùng liveChatCustomerId làm tên để đồng bộ với badge trong widget
   const displayName = (typeof liveChatCustomerId !== 'undefined' && liveChatCustomerId)
     ? liveChatCustomerId
     : 'Khách Live Chat';
   const avatarChar = displayName.charAt(0).toUpperCase();
 
-  MOCK.conversations.unshift({
-    id: newId,
-    name: displayName,
-    avatar: avatarChar,
-    time: now,
-    status: isEscalated ? 'escalate' : 'pending',
-    unread: 1,
-    preview: customerMsg.length > 55 ? customerMsg.substring(0, 55) + '...' : customerMsg,
-    category: isEscalated ? 'Cần duyệt' : 'Live Chat',
-    sentiment: sentimentScore,
-    wait_min: isEscalated ? 1 : 0,
-    priority: isEscalated ? 0 : 2,
-    ltv: 0,
-    orders: 0,
-    platform: 'Live Chat',
-    angry: sentimentScore < 30,
-    customer: {
-      note: `Live Chat · ID: ${displayName} · Confidence: ${conf !== null ? conf + '%' : '—'} · Cảm xúc: ${sentiment || 'bình thường'}`,
-      risk: isEscalated ? 'high' : 'low',
-      churn: '—',
-      purchases: []
-    }
-  });
+  // ── Tìm conversation hiện có của cùng customer (tránh tạo box trùng) ──
+  let existingConv = MOCK.conversations.find(c => c.name === displayName && c.platform === 'Live Chat');
 
-  // ── Thêm lịch sử tin nhắn ──
-  MOCK.chat_messages[newId] = [
-    { from: 'customer', time: now, text: customerMsg }
-  ];
+  if (existingConv) {
+    // Cập nhật conversation đã có thay vì tạo mới
+    existingConv.time    = now;
+    existingConv.unread  = (existingConv.unread || 0) + 1;
+    existingConv.preview = customerMsg.length > 55 ? customerMsg.substring(0, 55) + '...' : customerMsg;
+    existingConv.status  = isEscalated ? 'escalate' : existingConv.status;
+    existingConv.sentiment = sentimentScore;
+    existingConv.angry   = sentimentScore < 30;
+    existingConv.customer.note = `Live Chat · ID: ${displayName} · Confidence: ${conf !== null ? conf + '%' : '—'} · Cảm xúc: ${sentiment || 'bình thường'}`;
+    // Đưa lên đầu danh sách
+    MOCK.conversations = [existingConv, ...MOCK.conversations.filter(c => c !== existingConv)];
+  } else {
+    // Tạo conversation mới lần đầu
+    const newId = 'live_' + displayName.replace(/\W/g, '_');
+    existingConv = {
+      id: newId,
+      name: displayName,
+      avatar: avatarChar,
+      time: now,
+      status: isEscalated ? 'escalate' : 'pending',
+      unread: 1,
+      preview: customerMsg.length > 55 ? customerMsg.substring(0, 55) + '...' : customerMsg,
+      category: isEscalated ? 'Cần duyệt' : 'Live Chat',
+      sentiment: sentimentScore,
+      wait_min: isEscalated ? 1 : 0,
+      priority: isEscalated ? 0 : 2,
+      ltv: 0, orders: 0,
+      platform: 'Live Chat',
+      angry: sentimentScore < 30,
+      customer: {
+        note: `Live Chat · ID: ${displayName} · Confidence: ${conf !== null ? conf + '%' : '—'} · Cảm xúc: ${sentiment || 'bình thường'}`,
+        risk: isEscalated ? 'high' : 'low',
+        churn: '—',
+        purchases: []
+      }
+    };
+    MOCK.conversations.unshift(existingConv);
+    MOCK.chat_messages[existingConv.id] = [];
+  }
+
+  const convId = existingConv.id;
+
+  // ── Append tin nhắn vào lịch sử hội thoại ──
+  if (!MOCK.chat_messages[convId]) MOCK.chat_messages[convId] = [];
+  MOCK.chat_messages[convId].push({ from: 'customer', time: now, text: customerMsg });
 
   if (isEscalated) {
-    // Cần duyệt → hiển thị nháp AI để chủ shop quyết định
-    MOCK.chat_messages[newId].push(
+    // Xoá nháp cũ (nếu có) trước khi thêm nháp mới
+    MOCK.chat_messages[convId] = MOCK.chat_messages[convId].filter(
+      m => m.from !== 'ai_thinking' && m.from !== 'ai_draft'
+    );
+    MOCK.chat_messages[convId].push(
       { from: 'ai_thinking', text: 'AI phân tích ngữ cảnh và tìm kiếm trong knowledge base...', context: [
           `Confidence: ${conf !== null ? conf + '%' : '—'}`,
           `Cảm xúc: ${sentiment || 'bình thường'}`,
@@ -1868,12 +1888,7 @@ function _syncLiveChatToInbox(customerMsg, aiReply, evalData) {
     );
     showToast(`⚠️ Tin nhắn Live Chat cần duyệt — đã chuyển vào Hộp Thư!`, 'warning');
   } else {
-    // Tự động gửi → lưu làm log
-    MOCK.chat_messages[newId].push({
-      from: 'ai_sent',
-      time: now,
-      text: aiReply
-    });
+    MOCK.chat_messages[convId].push({ from: 'ai_sent', time: now, text: aiReply });
   }
 
   // ── Cập nhật badge số tin nhắn trong sidebar ──
