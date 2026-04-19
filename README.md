@@ -22,7 +22,7 @@ The system is divided into specialized Agents that communicate with each other v
 ### 1. 💬 Customer Service Agent (CSKH)
 - **Technology:** RAG (Retrieval-Augmented Generation) combined with ChromaDB.
 - **Task:** Reply to customer messages (Live Chat). Look up shop policies, product information, and conversation history.
-- **Key Features:** Capable of personalization based on *Customer Profiles* (calculating churn probability, LTV). Integrates a **Safety Guardrail**: If the customer is angry or the AI is not confident (`confidence_score < 0.7`), the message will be held back for the shop owner to approve.
+- **Key Features:** Capable of personalization based on *Customer Profiles* (calculating churn probability, LTV). Integrates a **Safety Guardrail**: If unsafe content is detected in the message (`is_safe == False`) or the AI is not confident (`confidence_score < 0.7`), the message will be held back for the shop owner to approve.
 
 ### 2. 💰 Pricing Agent (Pricing & Strategy)
 - **Task:** Analyze market data (competitor prices, ratings) and internal data (inventory, minimum profit margin).
