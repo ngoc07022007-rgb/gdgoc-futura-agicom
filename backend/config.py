@@ -23,15 +23,15 @@ chroma_client = chromadb.EphemeralClient()
 default_ef = embedding_functions.DefaultEmbeddingFunction()
 
 # Gemini Embedding (tuỳ chọn nâng cao)
-class GeminiEmbeddingFunction(embedding_functions.EmbeddingFunction):
-    def __call__(self, input: chromadb.Documents) -> chromadb.Embeddings:
-        response = client.models.embed_content(
-            model="text-embedding-004",
-            contents=input
-        )
-        return response.embeddings
+# class GeminiEmbeddingFunction(embedding_functions.EmbeddingFunction):
+#     def __call__(self, input: chromadb.Documents) -> chromadb.Embeddings:
+#         response = client.models.embed_content(
+#             model="text-embedding-004",
+#             contents=input
+#         )
+#         return response.embeddings
 
-gemini_ef = GeminiEmbeddingFunction()
+# gemini_ef = GeminiEmbeddingFunction()
 
 # Tạo/Lấy các Collections
 policy_col = chroma_client.get_or_create_collection(name="policy_db", embedding_function=default_ef)

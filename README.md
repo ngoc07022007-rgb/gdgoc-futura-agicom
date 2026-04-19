@@ -1,183 +1,148 @@
-# 🤖 Agicom - AI-Powered Customer Service Agent
+# 🚀 Agicom - E-commerce Management Agentic AI System
 
-**GDGoC Hackathon 2026 - Team FUTURA**
+**Project for GDGoC Hackathon 2026 - Team FUTURA**
 
-An intelligent multi-agent system designed to revolutionize e-commerce customer service through AI-driven insights, real-time coordination, and automated decision-making.
-
----
-
-## 📋 Overview
-
-Agicom is a sophisticated customer service management platform that leverages AI agents to handle diverse tasks across:
-
-- **Customer Support** - Intelligent chatbot for customer inquiries and support
-- **Review Analysis** - AI-powered sentiment analysis and insights from customer reviews
-- **Pricing Strategy** - Data-driven pricing recommendations and optimization
-- **Content Management** - Automated content generation and optimization
-- **Risk Management** - Proactive identification and mitigation of business risks
+**Agicom** is a smart E-commerce Management software system (E-commerce Dashboard) powered by a **Multi-Agent AI** architecture. Instead of just being a standard chatbot, Agicom operates as a virtual staff team, helping SME business owners automate Customer Service, Pricing Strategy Proposals, Content Planning, and Crisis Management in real-time.
 
 ---
 
-## 🎯 Key Features
+## 🌟 Why Agicom?
 
-### 🧠 Multi-Agent Architecture
-- **CS Agent**: Handles customer support tickets and inquiries
-- **Pricing Agent**: Analyzes market trends and recommends pricing strategies
-- **Content Agent**: Generates and optimizes product descriptions and marketing content
-- **Risk Agent**: Monitors and alerts on potential business risks
+SME shop owners are often overwhelmed with handling hundreds of messages, tracking competitor prices, and dealing with negative reviews. Agicom solves this problem using the **Observe -> Think -> Plan -> Act -> Learn** model:
+- **Automation:** AI automatically replies to customers based on shop policies & context.
+- **Optimization:** Tracks market prices to propose pricing strategies that maintain profit margins.
+- **Continuous Learning:** Automatically saves AI responses edited by the shop owner into a Vector DB so the AI becomes smarter every day.
 
-### 📊 Intelligent Dashboard
-- Real-time KPI tracking (Revenue, Orders, Conversion Rate, AOV)
-- Visual performance trends and analytics
-- Task coordination and workflow management
-- Daily summary reports and insights
+---
 
-### 💬 Advanced Chat System
-- Context-aware customer conversations
-- Chat history management
-- Personalized customer profiles
-- Ẩn danh (Anonymous) support
+## 🧠 Multi-Agent Architecture
 
-### 🗄️ Robust Data Management
-- Review log tracking with AI insights
-- Coordination task management
-- Daily archive and reporting
-- Multi-database support (SQLite/PostgreSQL)
+The system is divided into specialized Agents that communicate with each other via `CoordinationTasks` (SQLite):
+
+### 1. 💬 Customer Service Agent (CSKH)
+- **Technology:** RAG (Retrieval-Augmented Generation) combined with ChromaDB.
+- **Task:** Reply to customer messages (Live Chat). Look up shop policies, product information, and conversation history.
+- **Key Features:** Capable of personalization based on *Customer Profiles* (calculating churn probability, LTV). Integrates a **Safety Guardrail**: If the customer is angry or the AI is not confident (`confidence_score < 0.7`), the message will be held back for the shop owner to approve.
+
+### 2. 💰 Pricing Agent (Pricing & Strategy)
+- **Task:** Analyze market data (competitor prices, ratings) and internal data (inventory, minimum profit margin).
+- **Key Features:** Makes decisions to "Discount", "Increase price for positioning", or "Stand still". All decisions must ensure `min_margin_percent` (Slow Track flow).
+
+### 3. 📝 Content Agent (Content Creation)
+- **Task:** Listen to "pain points" from repeated questions in Live Chat and 1-3 star Reviews.
+- **Key Features:** Automatically proposes producing TikTok Videos, FAQ Blogs, Comparison articles... along with estimated implementation time and impact level.
+
+### 4. 🛡️ Risk & Quality Agent (Crisis Management)
+- **Task:** Monitor all reviews and conversations.
+- **Key Features:** If toxic phrases or 1-star reviews are detected, the AI switches the system state to **RED LEVEL**, automatically generating a *Crisis Response Plan* (Pause Ads, pre-draft customer apology templates).
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| **Backend** | Python (40.3%) |
-| **Frontend** | JavaScript (22.3%), HTML (5.7%) |
-| **Styling** | CSS (31.7%) |
-| **Database** | SQLAlchemy ORM |
-| **Framework** | FastAPI (Python backend) |
+- **Frontend:** HTML5, CSS3, Vanilla JavaScript (SPA Architecture, no frameworks used to optimize speed).
+- **Backend:** Python, FastAPI, SQLAlchemy.
+- **Database:** - **Relational DB:** PostgreSQL (Deploy) / SQLite (Local)
+  - **Vector DB:** ChromaDB (Stores knowledge base for RAG)
+- **AI Models:** Google Gemini (`gemini-flash-latest` for reasoning).
+- **Deployment:** Render (Backend) & Netlify (Frontend).
 
 ---
 
-## 📁 Project Structure
+## 🔌 Core Endpoints
 
+*(Note: The source code contains some experimental endpoints, below is the list of main APIs currently operating the system)*
+
+| HTTP | Endpoint | Function |
+|------|----------|-----------|
+| `POST` | `/chat-v3` | Live Chat communication: Processes RAG, analyzes customer sentiment, returns Confidence Score. |
+| `POST` | `/slow-track-strategy`| Pushes market data to AI for analysis and returns pricing strategy. |
+| `GET` | `/api/content-suggestions`| Fetches a list of Content proposals synthesized by AI from Chats & Reviews. |
+| `POST` | `/learn-from-review` | Analyzes new Reviews, extracts lessons to save to ChromaDB, creates warning tasks if reviews are bad. |
+| `POST` | `/learn-feedback` | Human-in-the-loop: Shop owner edits AI's response, system saves the new Q&A pair to memory. |
+| `GET` | `/api/crisis-overview`| Fetches aggregated crisis data (Bad reviews + Toxic chats) to display warnings. |
+| `GET` | `/daily-summary` | Exports Daily Report. |
+
+---
+
+## 💻 Local Setup & Run Guide
+
+### 1. Backend (FastAPI)
+Requirements: Python 3.8+
+
+```bash
+# 1. Clone the repository & navigate to the backend folder
+git clone https://github.com/your-repo/gdgoc-futura-agicom.git
+cd gdgoc-futura-agicom/backend
+
+# 2. Create a virtual environment and install dependencies
+python -m venv .venv
+source .venv/bin/activate  # (For Windows: venv\Scripts\activate)
+pip install -r requirements.txt
+
+# 3. Configure environment variables
+# Create a .env file and add your Google Gemini API Key
+echo "GOOGLE_API_KEY=your_gemini_api_key_here" > .env
+
+# 4. Start the Server
+uvicorn main:app --reload --port 8000
 ```
-gdgoc-futura-agicom/
-├── backend/
-│   ├── database.py          # Database models & ORM setup
-│   ├── agents/              # AI Agent implementations
-│   └── api/                 # FastAPI routes
-├── frontend/
-│   ├── assets/
-│   │   ├── css/             # Styling (components, variables)
-│   │   ├── js/              # JavaScript functionality
-│   │   └── images/          # Assets
-│   └── views/               # HTML pages
-├── requirements.txt         # Python dependencies
-└── README.md               # This file
+*Note: On the first run, the system will automatically call the `seed_demo.py` file to load sample data (products, chat history, vector DB) into SQLite and ChromaDB.*
+
+### 2. Frontend (HTML/JS)
+Because the Frontend uses pure Vanilla JS, you do not need to install Node.js or npm.
+1. Navigate to the `frontend/` directory.
+2. Open the `config.js` file and ensure the `AGICOM_API_BASE` variable is pointing to `http://localhost:8000`.
+3. Use **Live Server** (VSCode Extension) or Python HTTP server to run:
+```bash
+python -m http.server 3000
 ```
+4. Access `http://localhost:3000` to view the Dashboard.
 
 ---
 
-## 🚀 Getting Started
+## 🌍 Deployment Guide (Cloud)
 
-### Prerequisites
-- Python 3.8+
-- Node.js 14+ (optional, for frontend development)
-- PostgreSQL or SQLite
+The system is pre-configured for easy deployment on Cloud platforms:
 
-### Installation
+### Deploy Backend (Render)
+- The project includes a `render.yaml` file. You just need to create a Web Service on Render and point it to the repo.
+- Add environment variables: `GOOGLE_API_KEY` and `DATABASE_URL` (Using Render's PostgreSQL).
+- *Note on ChromaDB:* Due to Render's file system limits, the system uses `chromadb.EphemeralClient()`. Every time the server restarts, the code will automatically run `seed_demo.py` to reload the Knowledge base.
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/hmd-dsai/gdgoc-futura-agicom.git
-   cd gdgoc-futura-agicom
-   ```
-
-2. **Set up Python environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
-
-3. **Configure database**
-   - Update `SQLALCHEMY_DATABASE_URL` in `backend/database.py`
-   - Run migrations: `python -c "from backend.database import init_db; init_db()"`
-
-4. **Start the backend**
-   ```bash
-   cd backend
-   uvicorn main:app --reload
-   ```
-
-5. **Open the frontend**
-   - Serve frontend files using your preferred HTTP server
-   - Navigate to `http://localhost:8000`
+### Deploy Frontend (Netlify)
+- Point Netlify to the `frontend/` directory.
+- The `netlify.toml` and `_redirects` files are pre-configured to support SPA routing.
+- **Important:** Update the `frontend/config.js` file to change the `AGICOM_API_BASE` variable to your Render Backend domain.
 
 ---
 
-## 📊 Database Schema
-
-### Core Tables
-- **ChatLogs** - Customer service chat records
-- **ReviewLog** - Product reviews with AI insights
-- **CoordinationTask** - Inter-agent task assignments
-- **DailySummaryArchive** - Historical reports and insights
-- **ChatMessage** - Chat history for personalized conversations
-
----
-
-## 🔗 API Endpoints
-
-Key backend endpoints include:
-- `/chat` - Customer service chat interface
-- `/reviews` - Review analysis and insights
-- `/pricing` - Pricing recommendations
-- `/content` - Content generation
-- `/dashboard` - Analytics and KPI data
-
----
-
-## 👥 Team FUTURA
-
-**GDGoC Hackathon 2026 Project**
-
----
-
-## 📝 License
-
-This project is open source and available under the MIT License.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit issues and pull requests.
-
----
-
-## 📞 Support
-
-For questions or issues, please open a GitHub issue or contact the team.
-
----
-
-**Last Updated**: April 17, 2026
+## 📂 Repo Tree
+```text
+.
+├── backend
+│   ├── main.py             # Main Router & API Endpoints
+│   ├── services.py         # Processing logic of AI Agents
+│   ├── database.py         # SQLAlchemy Config & Database Models
+│   ├── models.py           # Pydantic Schemas for API
+│   ├── prompts.py          # System Prompts for Gemini AI
+│   ├── config.py           # ChromaDB & Gemini Client Config
+│   └── seed_demo.py        # Script to load sample data
+├── frontend
+│   ├── index.html          # UI Layout framework
+│   ├── app4.js             # Dashboard render logic & UI interaction
+│   ├── api_integration.js  # API integration calls to Backend
+│   ├── config.js           # Only file needing config changes for environments (Local/Cloud)
+│   └── index4.css          # Design System
+└── render.yaml             # Automated deployment config for Render
 ```
 
 ---
 
-## 💡 Next Steps
+## 👨‍💻 Development Team
 
-You can customize this README further by:
+**FUTURA TEAM - GDGoC Hackathon 2026**
+- *We believe that AI was not created to replace humans, but to serve as a powerful assistant, helping SME businesses focus on growth instead of operations.*
 
-1. **Adding a Demo/Screenshots section** with GIF or images of the dashboard
-2. **Including setup instructions** for AI model configuration
-3. **Adding API documentation** with example requests/responses
-4. **Documenting agent capabilities** in detail
-5. **Adding troubleshooting section** for common issues
-
-Would you like me to:
-- Update the README with any specific information?
-- Push this README to your repository?
-- Add additional sections?
+---
+*MIT License © 2026 Team FUTURA*
